@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>打开全部链接</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 2rem; max-width: 480px; margin: 0 auto; }
+    h1 { font-size: 1.125rem; margin-bottom: 0.5rem; }
+    button {
+      padding: 10px 20px; font-size: 16px; cursor: pointer;
+      background: #1a73e8; color: #fff; border: none; border-radius: 6px;
+    }
+    button:hover { background: #1557b0; }
+    .hint { color: #666; font-size: 14px; margin-top: 1rem; }
+    .error { color: #c5221f; }
+    ul { font-size: 14px; color: #444; margin-top: 1rem; padding-left: 1.25rem; }
+  </style>
+</head>
+<body>
+  <h1>打开全部链接</h1>
+  <p id="count"></p>
+  <button type="button" id="openAll">一键打开全部</button>
+  <p class="hint">点击上方按钮会在新标签页打开所有链接。若被拦截请允许此页面的弹窗。</p>
+  <ul id="list"></ul>
+
+  <script>
+    (function() {
+      var raw = decodeURIComponent((location.hash || '#').slice(1));
+      var urls = [];
+      try {
+        if (raw) urls = JSON.parse(raw);
+        if (!Array.isArray(urls)) urls = [];
+      } catch (e) {}
+      var countEl = document.getElementById('count');
+      var listEl = document.getElementById('list');
+      var btn = document.getElementById('openAll');
+      if (!urls.length) {
+        countEl.innerHTML = '<span class="error">未收到链接数据，请从「Google Trends 链接生成器」页面点击「批量打开所有链接」。</span>';
+        btn.disabled = true;
+        return;
+      }
+      countEl.innerHTML = '共 <strong>' + urls.length + '</strong> 个链接';
+      urls.forEach(function(u) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = u;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = u.length > 60 ? u.slice(0, 60) + '…' : u;
+        li.appendChild(a);
+        listEl.appendChild(li);
+      });
+      btn.onclick = function() {
+        urls.forEach(function(u) { window.open(u, '_blank', 'noopener'); });
+      };
+    })();
+  </script>
+</body>
+</html>

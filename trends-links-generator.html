@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Google Trends 链接生成器</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    .hint { color: #666; font-size: 0.875rem; margin-bottom: 0.75rem; }
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      padding: 0.75rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.875rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+    .actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      border-radius: 6px;
+      border: 1px solid #dadce0;
+      background: #f8f9fa;
+      cursor: pointer;
+    }
+    button:hover { background: #e8eaed; }
+    button.primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+    button.primary:hover { background: #1557b0; }
+    .output-section { margin-top: 1.5rem; }
+    .output-section h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+    #output {
+      width: 100%;
+      min-height: 120px;
+      padding: 0.75rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.75rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      background: #fafafa;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .copy-ok { color: #0f9d58; font-size: 0.75rem; margin-left: 0.5rem; }
+    .popup-hint { color: #666; font-size: 0.75rem; margin-top: 0.5rem; }
+    .code-section { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0; }
+    .code-section h2 { font-size: 1rem; margin-bottom: 0.35rem; }
+    .code-section .code-hint { color: #666; font-size: 0.8125rem; margin-bottom: 0.5rem; }
+    .code-block {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8125rem;
+      line-height: 1.4;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      background: #fafafa;
+      white-space: pre;
+      overflow-x: auto;
+      margin-bottom: 0.5rem;
+    }
+    .code-section .actions { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <h1>Google Trends 链接生成器</h1>
+  <p class="hint">在下方输入关键词数组（支持 JS 数组格式或每行一个关键词），点击生成即可得到 Explore 链接。</p>
+  <textarea id="input" placeholder="['image to text', 'humanize ai text', 'bold text generator']&#10;或每行一个：&#10;image to text&#10;humanize ai text"></textarea>
+  <div class="actions">
+    <button type="button" class="primary" id="btnGenerate">生成链接</button>
+    <button type="button" id="btnCopy">复制链接</button>
+    <button type="button" id="btnOpenAll">批量打开所有链接</button>
+  </div>
+  <div class="output-section">
+    <h2>生成的链接</h2>
+    <pre id="output"></pre>
+    <span id="copyStatus" class="copy-ok" style="display:none;">已复制</span>
+    <p class="popup-hint">批量打开：会先打开一个中间页，在中间页点击「一键打开全部」即可打开所有链接（避免被弹窗拦截）。</p>
+  </div>
+
+  <div class="code-section">
+    <h2>获取 Google 联想词（data-entityname 纯文本）</h2>
+    <p class="code-hint">在 Google 搜索/联想页打开开发者工具控制台，粘贴并执行以下代码，可得到联想建议的纯文本数组 <code>names</code>（已去掉 &lt;b&gt; 等标签）。</p>
+    <pre id="googleSuggestCode" class="code-block">const items = document.querySelectorAll('li[data-entityname]');
+const names = Array.from(items).map(li => {
+  const raw = li.getAttribute('data-entityname');
+  const div = document.createElement('div');
+  div.innerHTML = raw.replace(/&amp;lt;/g, '&lt;').replace(/&amp;gt;/g, '&gt;').replace(/&amp;amp;/g, '&amp;');
+  return (div.textContent || div.innerText || '').trim();
+});
+console.log(names);</pre>
+    <div class="actions">
+      <button type="button" id="btnCopySuggestCode">一键复制代码</button>
+    </div>
+    <span id="copySuggestStatus" class="copy-ok" style="display:none;">已复制</span>
+  </div>
+
+  <script>
+    const BASE = 'https://trends.google.com/explore?q=';
+    const QUERY = '&date=now%207-d&geo=Worldwide';
+
+    function parseKeywords(str) {
+      const trimmed = str.trim();
+      if (!trimmed) return [];
+
+      // 尝试解析 JS 数组：['a', 'b'] 或 ["a", "b"]
+      const arrayMatch = trimmed.match(/^\[[\s\S]*\]$/);
+      if (arrayMatch) {
+        try {
+          const parsed = JSON.parse(trimmed.replace(/'/g, '"'));
+          return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+        } catch (_) {
+          // 用正则提取引号内的内容
+          const matches = trimmed.matchAll(/['"]([^'"]*)['"]/g);
+          return [...matches].map(m => m[1].trim()).filter(Boolean);
+        }
+      }
+
+      // 按行分割，去掉空行和逗号
+      return trimmed
+        .split(/[\n,]+/)
+        .map(s => s.replace(/^['"\s]+|['"\s]+$/g, '').trim())
+        .filter(Boolean);
+    }
+
+    function buildUrl(keyword) {
+      return BASE + encodeURIComponent(keyword) + QUERY;
+    }
+
+    function generate() {
+      const raw = document.getElementById('input').value;
+      const keywords = parseKeywords(raw);
+      const lines = keywords.map(k => buildUrl(k));
+      document.getElementById('output').textContent = lines.length
+        ? lines.join('\n')
+        : '未解析到关键词，请检查输入格式。';
+    }
+
+    function copyOutput() {
+      const pre = document.getElementById('output');
+      const text = pre.textContent;
+      if (!text || text.startsWith('未解析')) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const status = document.getElementById('copyStatus');
+        status.style.display = 'inline';
+        setTimeout(() => { status.style.display = 'none'; }, 1500);
+      });
+    }
+
+    function getOutputUrls() {
+      const text = document.getElementById('output').textContent.trim();
+      if (!text || text.startsWith('未解析')) return [];
+      return text.split(/\s+/).filter(s => s.startsWith('http'));
+    }
+
+    function openAllLinks() {
+      const urls = getOutputUrls();
+      if (!urls.length) {
+        alert('请先生成链接，或当前没有有效链接。');
+        return;
+      }
+      // 用独立 HTML 页 + hash 传参，避免 data: URL 被拦截或无法执行脚本
+      const hash = encodeURIComponent(JSON.stringify(urls));
+      window.open('trends-open-all.html#' + hash, '_blank', 'noopener');
+    }
+
+    function copySuggestCode() {
+      var el = document.getElementById('googleSuggestCode');
+      var text = el.textContent
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      navigator.clipboard.writeText(text).then(function() {
+        var status = document.getElementById('copySuggestStatus');
+        status.style.display = 'inline';
+        setTimeout(function() { status.style.display = 'none'; }, 1500);
+      });
+    }
+
+    document.getElementById('btnGenerate').addEventListener('click', generate);
+    document.getElementById('btnCopy').addEventListener('click', copyOutput);
+    document.getElementById('btnOpenAll').addEventListener('click', openAllLinks);
+    document.getElementById('btnCopySuggestCode').addEventListener('click', copySuggestCode);
+  </script>
+</body>
+</html>
