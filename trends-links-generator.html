@@ -92,6 +92,7 @@
     }
     .keyword-chip:hover { background: #e8eaed; }
     .keyword-chip.copied { background: #e6f4ea; border-color: #34a853; color: #137333; }
+    .keyword-chip.was-copied { background: #d2e3fc; border-color: #a8c7fa; color: #1967d2; }
   </style>
 </head>
 <body>
@@ -129,7 +130,7 @@ console.log(names);</pre>
 
   <div class="keywords-section">
     <h2>预设关键词（点击复制）</h2>
-    <p class="keywords-hint">点击任意关键词可复制到剪贴板，便于粘贴到上方输入框组合使用。</p>
+    <p class="keywords-hint">点击任意关键词可复制到剪贴板。已复制过的会高亮显示，全部复制过后恢复默认。</p>
     <div id="keywordsList" class="keywords-list"></div>
   </div>
 
@@ -139,18 +140,43 @@ console.log(names);</pre>
 
     var PRESET_KEYWORDS = 'action,advisor,agent,ai,analyzer anime,answer,art,assistant,audio avatar,best,builder,calculator,cartoon cataloger,character,chart,chat,cheat checker,clue,code,coloring page,comparator compiler,composer,connector,constructor,convert converter,crawler,creator,dashboard,designer detector,diagram,directory,downloader,editor emoji,enhancer,evaluator,example,explorer extractor,face,faq,figure,filter finder,font,format,generator,graph guide,helper,hint,how to,humanizer icon,ideas,illustration,image,interior design interpreter,layout,list,logo,maker manager,meme,model,modifier,monitor music,navigator,notifier,online,optimizer paraphraser,pattern,photo,picture,planner portal,portrait,processor,product photo,receiver recommend,recorder,resources,responder,restorer review,sample,scheduler,scraper,sender simulator,solver,song,sound,speech starter,studio,style,summarizer,summary syncer,tattoo,template tester,text'.split(/[\s,]+/).filter(Boolean);
 
+    var STORAGE_KEY = 'trends_copied_keywords';
+
+    function getCopiedSet() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? new Set(JSON.parse(raw)) : new Set();
+      } catch (e) { return new Set(); }
+    }
+
+    function saveCopiedSet(set) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+    }
+
     function renderKeywords() {
       var container = document.getElementById('keywordsList');
+      var copiedSet = getCopiedSet();
       container.innerHTML = '';
       PRESET_KEYWORDS.forEach(function(kw) {
         var chip = document.createElement('span');
         chip.className = 'keyword-chip';
+        if (copiedSet.has(kw)) chip.classList.add('was-copied');
         chip.textContent = kw;
         chip.title = '点击复制';
         chip.addEventListener('click', function() {
           navigator.clipboard.writeText(kw).then(function() {
             chip.classList.add('copied');
             setTimeout(function() { chip.classList.remove('copied'); }, 600);
+            copiedSet.add(kw);
+            if (copiedSet.size >= PRESET_KEYWORDS.length) {
+              localStorage.removeItem(STORAGE_KEY);
+              copiedSet.clear();
+              var chips = container.querySelectorAll('.keyword-chip');
+              for (var i = 0; i < chips.length; i++) chips[i].classList.remove('was-copied');
+            } else {
+              chip.classList.add('was-copied');
+              saveCopiedSet(copiedSet);
+            }
           });
         });
         container.appendChild(chip);
