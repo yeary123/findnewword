@@ -56,6 +56,11 @@
       white-space: pre-wrap;
       word-break: break-all;
     }
+    #output a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    #output a:hover { text-decoration: underline; }
     .copy-ok { color: #0f9d58; font-size: 0.75rem; margin-left: 0.5rem; }
     .popup-hint { color: #666; font-size: 0.75rem; margin-top: 0.5rem; }
     .code-section { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0; }
@@ -211,13 +216,29 @@ console.log(names);</pre>
       return BASE + encodeURIComponent(keyword) + QUERY;
     }
 
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     function generate() {
       const raw = document.getElementById('input').value;
       const keywords = parseKeywords(raw);
       const lines = keywords.map(k => buildUrl(k));
-      document.getElementById('output').textContent = lines.length
-        ? lines.join('\n')
-        : '未解析到关键词，请检查输入格式。';
+      const output = document.getElementById('output');
+      if (!lines.length) {
+        output.textContent = '未解析到关键词，请检查输入格式。';
+        return;
+      }
+      output.innerHTML = lines
+        .map(function(url) {
+          var safe = escapeHtml(url);
+          return '<a href="' + safe + '" target="_blank" rel="noopener">' + safe + '</a>';
+        })
+        .join('\n');
     }
 
     function copyOutput() {
